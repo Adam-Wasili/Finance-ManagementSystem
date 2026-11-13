@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<!-- ============================================================
+     Personal Finance Tracker — standalone project
+     A browser rebuild of the Python/Tkinter + SQLite desktop app.
+     There is no backend: accounts and transactions are stored in
+     this browser with localStorage (see app.js).
+
+     Files:
+       index.html  — this page
+       styles.css  — all styles for the app
+       app.js      — auth, storage, rendering and events
+     ============================================================ -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal Finance Tracker</title>
+  <meta name="description" content="A personal finance tracker built with HTML, CSS and JavaScript. Track income and expenses, with data stored privately in your browser.">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="finance-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="app-bar">
+    <div class="container app-bar-inner">
+      <a class="app-brand" href="index.html">
+        <span class="app-brand-mark" aria-hidden="true">K</span>
+        Finance Tracker
+      </a>
+      <p class="app-bar-note">A personal budgeting demo</p>
+    </div>
+  </header>
+
+  <main id="main" class="finance-main">
+    <noscript>
+      <div class="container">
+        <p class="notice">This finance tracker needs JavaScript to store and display your transactions.</p>
+      </div>
+    </noscript>
+
+    <!-- ========================================================
+         1. AUTH SCREEN — shown until a user signs in.
+         ======================================================== -->
+    <section class="auth-section" id="auth-view" aria-labelledby="auth-title">
+      <div class="container auth-layout">
+        <div class="auth-copy">
+          <p class="eyebrow">Finance tracker</p>
+          <h1 id="auth-title">Know where every kwacha goes.</h1>
+          <p class="lead">
+            A small budgeting app that records income and expenses, groups spending
+            by category and keeps a running balance. It began as a Python and SQLite
+            desktop tool and has been rebuilt here for the browser.
+          </p>
+
+          <ul class="feature-list">
+            <li>Add, edit and delete transactions in seconds.</li>
+            <li>See this month's spending broken down by category.</li>
+            <li>Filter by type, category, month or keyword.</li>
+            <li>Your data stays in this browser — nothing is uploaded.</li>
+          </ul>
+
+          <p class="storage-note">
+            Passwords are salted and hashed before they are stored. This is still a
+            front-end demo, so please do not reuse a real password.
+          </p>
+        </div>
+
+        <div class="auth-card">
+          <div class="auth-switch" role="group" aria-label="Sign in or create an account">
+            <button type="button" class="auth-switch-btn" data-mode="signin" aria-pressed="true">Sign in</button>
+            <button type="button" class="auth-switch-btn" data-mode="register" aria-pressed="false">Create account</button>
+          </div>
+
+          <form id="auth-form" novalidate>
+            <div class="field">
+              <label for="auth-username">Username</label>
+              <input id="auth-username" name="username" type="text"
+                     autocomplete="username" minlength="3" maxlength="24"
+                     spellcheck="false" required>
+            </div>
+
+            <div class="field">
+              <label for="auth-password">Password</label>
+              <input id="auth-password" name="password" type="password"
+                     autocomplete="current-password" required>
+              <p class="form-hint" id="auth-hint" hidden>At least 8 characters.</p>
+            </div>
+
+            <p class="form-error" id="auth-error" role="alert" hidden></p>
+
+            <button class="btn btn-primary btn-block" id="auth-submit" type="submit">Sign in</button>
+          </form>
+
+          <div class="auth-divider"><span>or</span></div>
+
+          <button class="btn btn-ghost btn-block" id="demo-btn" type="button">
+            Explore with demo data
+          </button>
+          <p class="auth-note">
+            The demo account is created on your device with three months of sample
+            transactions, so you can try every feature without registering.
+          </p>
+
+          <p class="auth-note">
+            Everything is saved in this browser (localStorage). Clearing your browser
+            data will erase the accounts and transactions.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================
+         2. APP SCREEN — dashboard, chart and transactions table.
+         ======================================================== -->
+    <section class="app-section" id="app-view" aria-labelledby="app-title" hidden>
+      <div class="container">
+
+        <div class="app-header">
+          <div>
+            <p class="eyebrow">Dashboard</p>
+            <h1 id="app-title">Welcome back, <span id="user-name">there</span></h1>
+            <p class="muted app-subtitle" id="app-subtitle">Your transactions are stored in this browser.</p>
+          </div>
+
+          <div class="app-actions">
+            <button type="button" class="btn btn-primary" id="add-btn">+ Add transaction</button>
+            <button type="button" class="btn btn-ghost" id="logout-btn">Log out</button>
+          </div>
+        </div>
+
+        <h2 class="visually-hidden">Summary</h2>
+        <div class="stat-grid">
+          <article class="stat-card stat-card--balance">
+            <p class="stat-label">Balance (all time)</p>
+            <p class="stat-value" id="stat-balance">MWK 0.00</p>
+            <p class="stat-note" id="stat-balance-note">No transactions yet</p>
+          </article>
+
+          <article class="stat-card stat-card--income">
+            <p class="stat-label">Income (this month)</p>
+            <p class="stat-value income" id="stat-income">MWK 0.00</p>
+            <p class="stat-note" id="stat-income-note">This month</p>
+          </article>
+
+          <article class="stat-card stat-card--expense">
+            <p class="stat-label">Spending (this month)</p>
+            <p class="stat-value expense" id="stat-expense">MWK 0.00</p>
+            <p class="stat-note" id="stat-expense-note">This month</p>
+          </article>
+        </div>
+
+        <section class="panel" aria-labelledby="chart-title">
+          <div class="panel-head">
+            <div>
+              <h2 id="chart-title">Spending by category</h2>
+              <p class="panel-sub" id="chart-sub">This month</p>
+            </div>
+          </div>
+
+          <div class="chart" id="chart"></div>
+          <p class="empty-state" id="chart-empty" hidden>
+            No expenses recorded this month. Add one to see the breakdown.
+          </p>
+        </section>
+
+        <section class="panel" aria-labelledby="tx-title">
+          <div class="panel-head">
+            <div>
+              <h2 id="tx-title">Transactions</h2>
+              <p class="panel-sub" id="tx-sub">All saved entries</p>
+            </div>
+          </div>
+
+          <div class="filters">
+            <div class="field field--search">
+              <label for="filter-search">Search</label>
+              <input id="filter-search" type="search" placeholder="Category or note"
+                     autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="filter-type">Type</label>
+              <select id="filter-type">
+                <option value="all">All types</option>
+                <option value="income">Income</option>
+                <option value="expense">Expenses</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="filter-category">Category</label>
+              <select id="filter-category"></select>
+            </div>
+
+            <div class="field">
+              <label for="filter-month">Month</label>
+              <input id="filter-month" type="month" placeholder="YYYY-MM">
+            </div>
+
+            <button type="button" class="btn btn-ghost filter-reset" id="filter-reset">Reset</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="tx-table">
+              <caption class="visually-hidden">
+                Transactions for the signed-in user, filtered by the controls above.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Note</th>
+                  <th scope="col" class="amount">Amount</th>
+                  <th scope="col" class="actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tx-body"></tbody>
+            </table>
+
+            <p class="empty-state" id="tx-empty" hidden>
+              No transactions match these filters yet. Use <strong>Add transaction</strong>
+              above, or reset the filters.
+            </p>
+
+            <div class="table-summary" id="tx-summary">
+              <span id="tx-count">0 transactions shown</span>
+              <span>Income <strong class="amount-income" id="tx-income">MWK 0.00</strong></span>
+              <span>Expenses <strong class="amount-expense" id="tx-expense">MWK 0.00</strong></span>
+              <span>Net <strong id="tx-net">MWK 0.00</strong></span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div class="container app-footer-inner">
+      <p>Personal Finance Tracker — a front-end demo. Data stays in this browser.</p>
+      <p>Built with HTML, CSS and JavaScript.</p>
+    </div>
+  </footer>
+
+  <!-- ========================================================
+       ADD / EDIT DIALOG — one <dialog> serves both actions.
+       ======================================================== -->
+  <dialog class="tx-dialog" id="tx-dialog" aria-labelledby="tx-dialog-title">
+    <form id="tx-form" novalidate>
+      <h2 id="tx-dialog-title">Add transaction</h2>
+
+      <div class="field">
+        <label for="tx-type">Type</label>
+        <select id="tx-type">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="tx-category">Category</label>
+        <input id="tx-category" type="text" list="tx-category-options"
+               maxlength="40" placeholder="e.g. Groceries" autocomplete="off" required>
+        <datalist id="tx-category-options"></datalist>
+      </div>
+
+      <div class="field">
+        <label for="tx-amount">Amount</label>
+        <div class="amount-field">
+          <span class="amount-prefix" id="amount-prefix">MWK</span>
+          <input id="tx-amount" type="text" inputmode="decimal"
+                 placeholder="0.00" autocomplete="off" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="tx-date">Date</label>
+        <input id="tx-date" type="date" required>
+      </div>
+
+      <div class="field">
+        <label for="tx-note">Note <span class="optional">(optional)</span></label>
+        <textarea id="tx-note" rows="2" maxlength="120"
+                  placeholder="What was this for?"></textarea>
+      </div>
+
+      <p class="form-error" id="tx-error" role="alert" hidden></p>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" id="tx-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="tx-save">Add transaction</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
